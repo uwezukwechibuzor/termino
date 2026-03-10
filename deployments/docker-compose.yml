@@ -1,0 +1,177 @@
+version: "3.8"
+
+services:
+  # --- Infrastructure ---
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    volumes:
+      - zookeeper-data:/var/lib/zookeeper/data
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_NUM_PARTITIONS: 6
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_RETENTION_HOURS: 168
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: crypto
+      POSTGRES_PASSWORD: crypto
+      POSTGRES_DB: cryptodb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crypto"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+
+  # --- Application Services ---
+  price-producer:
+    build:
+      context: ..
+      args:
+        SERVICE: price-producer
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKERS: kafka:29092
+      POLL_INTERVAL: "5"
+      SYMBOLS: BTC,ETH,SOL,ADA,DOT,AVAX,MATIC,LINK
+      PROMETHEUS_PORT: "9090"
+      LOG_LEVEL: info
+    ports:
+      - "9100:9090"
+    restart: unless-stopped
+
+  price-aggregator:
+    build:
+      context: ..
+      args:
+        SERVICE: price-aggregator
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKERS: kafka:29092
+      LOG_LEVEL: info
+    ports:
+      - "9101:9091"
+    restart: unless-stopped
+
+  alert-service:
+    build:
+      context: ..
+      args:
+        SERVICE: alert-service
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKERS: kafka:29092
+      LOG_LEVEL: info
+    ports:
+      - "9102:9092"
+    restart: unless-stopped
+
+  db-writer:
+    build:
+      context: ..
+      args:
+        SERVICE: db-writer
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKERS: kafka:29092
+      POSTGRES_DSN: postgres://crypto:crypto@postgres:5432/cryptodb?sslmode=disable
+      LOG_LEVEL: info
+    ports:
+      - "9103:9093"
+    restart: unless-stopped
+
+  streaming-api:
+    build:
+      context: ..
+      args:
+        SERVICE: streaming-api
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKERS: kafka:29092
+      HTTP_PORT: "8080"
+      LOG_LEVEL: info
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  # --- Monitoring ---
+  prometheus:
+    image: prom/prometheus:v2.50.1
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=7d'
+
+  grafana:
+    image: grafana/grafana:10.3.3
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - prometheus
+
+volumes:
+  zookeeper-data:
+  kafka-data:
+  postgres-data:
+  redis-data:
+  prometheus-data:
+  grafana-data:

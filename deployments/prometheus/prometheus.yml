@@ -1,0 +1,24 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'price-producer'
+    static_configs:
+      - targets: ['price-producer:9090']
+
+  - job_name: 'price-aggregator'
+    static_configs:
+      - targets: ['price-aggregator:9091']
+
+  - job_name: 'alert-service'
+    static_configs:
+      - targets: ['alert-service:9092']
+
+  - job_name: 'db-writer'
+    static_configs:
+      - targets: ['db-writer:9093']
+
+  - job_name: 'streaming-api'
+    static_configs:
+      - targets: ['streaming-api:8080']
