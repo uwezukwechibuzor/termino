@@ -1,5 +1,8 @@
 version: "3.8"
 
+# Loads .env from project root automatically when using:
+#   docker compose --env-file ../.env -f deployments/docker-compose.yml up
+
 services:
   # --- Infrastructure ---
   zookeeper:
