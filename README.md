@@ -217,74 +217,64 @@ termino/
 ```bash
 git clone https://github.com/uwezukwechibuzor/termino.git
 cd termino
-```
-
-Copy the environment template:
-
-```bash
 cp .env.example .env
 ```
 
 Review `.env` and adjust any values if needed. The defaults work out of the box for local development.
 
-### Step 2: Start infrastructure
+### Step 2: Start all services
 
-This starts Kafka, Zookeeper, PostgreSQL, Redis, Prometheus, and Grafana:
+**Option A: Run everything with Docker (recommended)**
 
-```bash
-make infra
-```
-
-Wait ~15-20 seconds for Kafka to become healthy. You can check status:
-
-```bash
-make status
-```
-
-Look for `kafka` showing `healthy` in the output. You can also watch logs:
-
-```bash
-docker compose -f deployments/docker-compose.yml logs -f kafka
-```
-
-### Step 3: Run the services
-
-**Option A: Run all services locally (recommended for development)**
-
-Run each in a separate terminal tab:
-
-```bash
-# Terminal 1 - Price Producer (fetches prices, publishes to Kafka)
-make run-producer
-
-# Terminal 2 - Price Aggregator (computes averages, change %)
-make run-aggregator
-
-# Terminal 3 - Alert Service (evaluates price rules)
-make run-alerts
-
-# Terminal 4 - DB Writer (persists to PostgreSQL)
-make run-dbwriter
-
-# Terminal 5 - Streaming API (SSE server for CLI clients)
-make run-streaming
-```
-
-Or run all at once in the background:
-
-```bash
-make run-all
-```
-
-**Option B: Run everything via Docker (including services)**
+A single command builds and starts all infrastructure (Kafka, Zookeeper, PostgreSQL, Redis, Prometheus, Grafana) and all application services in Docker containers:
 
 ```bash
 make up
 ```
 
-This builds and starts all services plus infrastructure in Docker containers.
+Check that all services are running:
 
-### Step 4: Build and use the CLI
+```bash
+make status
+```
+
+View logs:
+
+```bash
+make logs
+```
+
+To stop everything:
+
+```bash
+make down
+```
+
+**Option B: Run services locally (for development)**
+
+Start infrastructure first:
+
+```bash
+make infra
+```
+
+Wait ~15-20 seconds for Kafka to become healthy, then run all services in the background:
+
+```bash
+make run-all
+```
+
+Or run each service in a separate terminal for individual log visibility:
+
+```bash
+make run-producer      # Terminal 1 - Fetches prices, publishes to Kafka
+make run-aggregator    # Terminal 2 - Computes averages, change %
+make run-alerts        # Terminal 3 - Evaluates price rules
+make run-dbwriter      # Terminal 4 - Persists to PostgreSQL
+make run-streaming     # Terminal 5 - SSE server for CLI clients
+```
+
+### Step 3: Build and use the CLI
 
 ```bash
 make build-cli
@@ -316,7 +306,7 @@ make install-cli
 crypto-stream prices BTC ETH SOL
 ```
 
-### Step 5: Access monitoring dashboards
+### Step 4: Access monitoring dashboards
 
 | Service | URL | Credentials |
 |---|---|---|

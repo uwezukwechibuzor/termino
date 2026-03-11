@@ -5,7 +5,10 @@
       "Bash(go mod:*)",
       "Bash(go get:*)",
       "Bash(go build:*)",
-      "Bash(git:*)"
+      "Bash(git:*)",
+      "Bash(docker system:*)",
+      "Bash(docker info:*)",
+      "Bash(docker compose:*)"
     ]
   }
 }
