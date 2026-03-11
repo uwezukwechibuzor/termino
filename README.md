@@ -21,8 +21,7 @@ crypto-stream prices BTC ETH SOL
 
 <img width="1019" height="532" alt="Screenshot 2026-03-11 at 14 56 47" src="https://github.com/user-attachments/assets/2c2442b5-2baf-483d-aaa7-0383a821e6a0" />
 
-
-<img width="1385" height="790" alt="Screenshot 2026-03-11 at 14 58 04" src="https://github.com/user-attachments/assets/9ad49962-72c3-4d0b-9fb7-54a9e97f9eca" />
+<img width="1385" height="790" alt="Screenshot 2026-03-11 at 15 52 57" src="https://github.com/user-attachments/assets/94e21477-93e2-4c22-aa7a-0498dc51f4ca" />
 
 
 ## System Architecture
