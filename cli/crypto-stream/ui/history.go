@@ -13,30 +13,32 @@ import (
 )
 
 type historyMsg struct {
-	prices map[string]models.AggregatedPrice
+	prices []models.AggregatedPrice
 }
 
 type historyModel struct {
 	table     table.Model
 	symbol    string
 	serverURL string
+	prices    []models.AggregatedPrice
 	err       error
 }
 
 func RunHistory(serverURL string, symbol string) {
 	columns := []table.Column{
-		{Title: "SYMBOL", Width: 8},
+		{Title: "TIME", Width: 18},
 		{Title: "PRICE", Width: 14},
 		{Title: "AVG", Width: 14},
 		{Title: "HIGH", Width: 14},
 		{Title: "LOW", Width: 14},
 		{Title: "CHANGE %", Width: 10},
+		{Title: "VOLUME", Width: 14},
 	}
 
 	t := table.New(
 		table.WithColumns(columns),
 		table.WithFocused(true),
-		table.WithHeight(10),
+		table.WithHeight(20),
 	)
 
 	s := table.DefaultStyles()
@@ -45,6 +47,9 @@ func RunHistory(serverURL string, symbol string) {
 		BorderForeground(lipgloss.Color("240")).
 		BorderBottom(true).
 		Bold(true)
+	s.Selected = s.Selected.
+		Foreground(lipgloss.Color("229")).
+		Background(lipgloss.Color("57"))
 	t.SetStyles(s)
 
 	m := &historyModel{
@@ -53,37 +58,41 @@ func RunHistory(serverURL string, symbol string) {
 		serverURL: serverURL,
 	}
 
-	p := tea.NewProgram(m)
+	p := tea.NewProgram(m, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Error: %v\n", err)
 	}
 }
 
 func (m *historyModel) Init() tea.Cmd {
-	return m.fetchLatest()
+	return m.fetchHistory()
 }
 
 func (m *historyModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		if msg.String() == "q" || msg.String() == "ctrl+c" {
+		if msg.String() == "q" || msg.String() == "ctrl+c" || msg.String() == "esc" {
 			return m, tea.Quit
 		}
 		if msg.String() == "r" {
-			return m, m.fetchLatest()
+			return m, m.fetchHistory()
 		}
 
 	case historyMsg:
-		rows := make([]table.Row, 0)
-		if p, ok := msg.prices[m.symbol]; ok {
+		m.prices = msg.prices
+		m.err = nil
+		rows := make([]table.Row, 0, len(msg.prices))
+		for _, p := range msg.prices {
+			ts := time.Unix(p.Timestamp, 0).Format("2006-01-02 15:04")
 			changeStr := fmt.Sprintf("%.2f%%", p.ChangePct)
 			rows = append(rows, table.Row{
-				p.Symbol,
+				ts,
 				formatPrice(p.Price),
 				formatPrice(p.AvgPrice),
 				formatPrice(p.HighPrice),
 				formatPrice(p.LowPrice),
 				changeStr,
+				formatVolume(p.Volume),
 			})
 		}
 		m.table.SetRows(rows)
@@ -104,21 +113,60 @@ func (m *historyModel) View() string {
 		s += redStyle.Render(fmt.Sprintf("  Error: %v\n\n", m.err))
 	}
 
+	// Sparkline chart of price history
+	if len(m.prices) > 1 {
+		// Reverse so oldest is first for sparkline
+		data := make([]float64, len(m.prices))
+		for i, p := range m.prices {
+			data[len(m.prices)-1-i] = p.Price
+		}
+
+		min, max := data[0], data[0]
+		for _, v := range data {
+			if v < min {
+				min = v
+			}
+			if v > max {
+				max = v
+			}
+		}
+
+		s += fmt.Sprintf("  Price Range: %s - %s (%d points)\n",
+			formatPrice(min), formatPrice(max), len(data))
+		s += "  " + renderSparkline(data) + "\n\n"
+	}
+
 	s += m.table.View() + "\n"
+
+	// Summary stats
+	if len(m.prices) > 0 {
+		latest := m.prices[0]
+		oldest := m.prices[len(m.prices)-1]
+		s += "\n"
+		s += dimStyle.Render(fmt.Sprintf("  Latest: %s | Oldest: %s | Records: %d",
+			formatPrice(latest.Price), formatPrice(oldest.Price), len(m.prices)))
+		s += "\n"
+	}
+
 	s += dimStyle.Render("  Press r to refresh, q to quit\n")
 	return s
 }
 
-func (m *historyModel) fetchLatest() tea.Cmd {
+func (m *historyModel) fetchHistory() tea.Cmd {
 	return func() tea.Msg {
-		client := &http.Client{Timeout: 5 * time.Second}
-		resp, err := client.Get(m.serverURL + "/prices")
+		client := &http.Client{Timeout: 10 * time.Second}
+		url := fmt.Sprintf("%s/history?symbol=%s&limit=50", m.serverURL, m.symbol)
+		resp, err := client.Get(url)
 		if err != nil {
 			return errMsg{err}
 		}
 		defer resp.Body.Close()
 
-		var prices map[string]models.AggregatedPrice
+		if resp.StatusCode != http.StatusOK {
+			return errMsg{fmt.Errorf("server returned %d", resp.StatusCode)}
+		}
+
+		var prices []models.AggregatedPrice
 		if err := json.NewDecoder(resp.Body).Decode(&prices); err != nil {
 			return errMsg{err}
 		}

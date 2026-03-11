@@ -42,9 +42,21 @@ type PriceAlert struct {
 
 // AlertRule defines a price alert rule.
 type AlertRule struct {
+	ID        string  `json:"id"`
 	Symbol    string  `json:"symbol"`
 	Threshold float64 `json:"threshold"`
 	Direction string  `json:"direction"` // "above" or "below"
+}
+
+// DLQMessage represents a message in the dead letter queue.
+type DLQMessage struct {
+	Key           string `json:"key"`
+	Value         string `json:"value"`
+	OriginalTopic string `json:"original_topic"`
+	OriginalGroup string `json:"original_group"`
+	ErrorMessage  string `json:"error_message"`
+	RetryCount    string `json:"retry_count"`
+	FailedAt      string `json:"failed_at"`
 }
 
 func (p *PriceEvent) Marshal() ([]byte, error) {

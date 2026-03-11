@@ -76,10 +76,12 @@ func main() {
 		batch:  make([]models.AggregatedPrice, 0, 100),
 	}
 
-	consumer := kafka.NewConsumer(
+	consumer := kafka.NewConsumerWithDLQ(
 		cfg.KafkaBrokers,
 		cfg.KafkaTopicAgg,
 		"db-writer-group",
+		cfg.KafkaTopicDLQ,
+		cfg.DLQMaxRetries,
 		log,
 	)
 

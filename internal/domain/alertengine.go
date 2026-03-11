@@ -27,6 +27,32 @@ func (e *AlertEngine) AddRule(rule models.AlertRule) {
 	e.rules = append(e.rules, rule)
 }
 
+// RemoveRule removes a rule by ID.
+func (e *AlertEngine) RemoveRule(id string) bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	for i, r := range e.rules {
+		if r.ID == id {
+			e.rules = append(e.rules[:i], e.rules[i+1:]...)
+			key := fmt.Sprintf("%s-%s-%.2f", r.Symbol, r.Direction, r.Threshold)
+			delete(e.fired, key)
+			return true
+		}
+	}
+	return false
+}
+
+// ListRules returns a copy of all current rules.
+func (e *AlertEngine) ListRules() []models.AlertRule {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	result := make([]models.AlertRule, len(e.rules))
+	copy(result, e.rules)
+	return result
+}
+
 func (e *AlertEngine) Evaluate(price models.AggregatedPrice) []models.PriceAlert {
 	e.mu.RLock()
 	defer e.mu.RUnlock()

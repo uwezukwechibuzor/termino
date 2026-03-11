@@ -47,10 +47,12 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	consumer := kafka.NewConsumer(
+	consumer := kafka.NewConsumerWithDLQ(
 		cfg.KafkaBrokers,
 		cfg.KafkaTopicPrices,
 		"price-aggregator-group",
+		cfg.KafkaTopicDLQ,
+		cfg.DLQMaxRetries,
 		log,
 	)
 
