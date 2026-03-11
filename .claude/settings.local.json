@@ -8,7 +8,13 @@
       "Bash(git:*)",
       "Bash(docker system:*)",
       "Bash(docker info:*)",
-      "Bash(docker compose:*)"
+      "Bash(docker compose:*)",
+      "Bash(curl -s --max-time 5 http://localhost:8080/health 2>&1)",
+      "Bash(docker ps:*)",
+      "Bash(docker container:*)",
+      "Bash(curl -s --connect-timeout 3 --max-time 5 http://localhost:8080/prices 2>&1; echo \"EXIT: $?\")",
+      "Bash(curl -v --connect-timeout 2 --max-time 3 http://localhost:8080/health 2>&1)",
+      "Bash(GOTOOLCHAIN=local go mod tidy 2>&1)"
     ]
   }
 }
